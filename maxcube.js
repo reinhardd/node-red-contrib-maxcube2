@@ -36,7 +36,7 @@ module.exports = function(RED) {
     });
 
     node.serverConfig.on('error', function (err) {
-      node.log(err);
+      //node.log(err);
       node.status({fill:"red",shape:"dot",text:"Error: "+err});
     });
 
@@ -238,6 +238,21 @@ module.exports = function(RED) {
     this.port = config.port;
     this.disabled = config.disabled;
 
+    var delay = config.delay || 90000;
+
+    var connectionTimeout;
+
+    //avoid spam reconnection by setting a timeout
+    node.maxcubeScheduleConnection = function(){
+
+      if(!connectionTimeout){
+        connectionTimeout = setTimeout(function(){
+            connectionTimeout = undefined;
+            node.maxcubeConnect();
+        }, delay);
+      }
+    };
+
     node.maxcubeConnect = function(){
 
       if(node.maxCube){
@@ -261,8 +276,8 @@ module.exports = function(RED) {
           node.emit('closed');
           connected = false;
           if(node.maxCube != null) {
-            node.log("Maxcube connection closed unexpectedly... will try to reconnect.");
-            node.maxcubeConnect();
+            node.log("Maxcube connection closed unexpectedly... will try to reconnect in "+ delay+ " ms");
+            node.maxcubeScheduleConnection();
           }
           else
             node.log("Maxcube connection closed...");
@@ -270,11 +285,11 @@ module.exports = function(RED) {
         node.maxCube.on('error', function (e) {
           node.emit('error', e);
           node.log("Error connecting to the cube.");
-          node.log(JSON.stringify(e));
+          node.log(e);
           connected = false;
           //force node to init connection if not available
-          node.log("Maxcube was disconnected... will try to reconnect.");
-          node.maxcubeConnect();
+          node.log("Maxcube was disconnected... will try to reconnect in "+ delay+ " ms");
+          node.maxcubeScheduleConnection();
         });
         node.maxCube.on('connected', function () {
           node.emit('connected');
@@ -289,6 +304,9 @@ module.exports = function(RED) {
         var maxCube = node.maxCube;
         node.maxCube = null;
         maxCube.close();
+        if(connectionTimeout){
+           clearTimeout(connectionTimeout);
+        }
       }
     });
 
