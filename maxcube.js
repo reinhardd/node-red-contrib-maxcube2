@@ -102,11 +102,29 @@ module.exports = function(RED) {
           sendCommStatus(node, false, data, e);
         });
       };
+      // setSchedule(rf_address, room_id, weekday, temperaturesArray, timesArray)
+      var setSchedule = function(rf_address, room_id, weekday, temperaturesArray, timesArray) {
+        maxCube.setSchedule(rf_address, room_id, weekday, temperaturesArray, timesArray).then(function (success) {
+          var data = [rf_address, room_id, weekday, temperaturesArray, timesArray].filter(function (val) {return val;}).join(', ');
+          if (success) {
+            node.log('Schedule set for ' + room_id + ' on day ' + weekday);
+          } else {
+            node.log('Error setting schedule for ' + room_id + ' on day ' + weekday);
+          }
+          sendCommStatus(node, success, data);
+        }).catch(function(e){
+          node.warn(e);
+          sendCommStatus(node, false, data, e);
+        });
+      };
 
       var devices = [];
       //specific device
-      if(msg.payload.rf_address){
-        setTemp(msg.payload.rf_address, msg.payload.degrees, msg.payload.mode, msg.payload.untilDate);
+      if(msg.payload.rf_address) {
+        if (msg.payload.degrees)
+          setTemp(msg.payload.rf_address, msg.payload.degrees, msg.payload.mode, msg.payload.untilDate);
+        else
+          setSchedule(msg.payload.rf_address, msg.payload.room_id, msg.payload.weekday, msg.payload.temperaturesArray, msg.payload.timesArray);
       }else{
         //all devices: query getDeviceStatus, then update all!
         maxCube.getDeviceStatus().then(function (devices) {
